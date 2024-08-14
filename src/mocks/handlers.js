@@ -23,6 +23,7 @@ export const handlers = [
     }
   }),
   http.post("http://localhost:5173/post/:id", async ({ params, request }) => {
+    await delay(3000);
     const postId = params.id;
     const reqData = await request.json();
     let followingPosts, globalPosts;
@@ -31,6 +32,7 @@ export const handlers = [
       [followingPosts, globalPosts] = JSON.parse(persistedPosts);
       followingPosts = updatePost(followingPosts, postId, reqData["userId"]);
       globalPosts = updatePost(globalPosts, postId, reqData["userId"]);
+      // return HttpResponse.error();
       return HttpResponse.json({ followingPosts, globalPosts });
     } catch (err) {
       return HttpResponse.error();
