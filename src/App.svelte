@@ -8,48 +8,62 @@
   let followingPosts,
     isFollowingPostsPending = true,
     isFollowingPostsError,
-    followingPostsForMutation,
+    followingPostsResponse,
     globalPosts,
     isGlobalPostsPending = true,
     isGlobalPostsError,
-    globalPostsForMutation;
+    globalPostsResponse;
 
   onMount(async () => {
     broadcastChannel.onmessage = (event) => {
       if (event.data.type === "toggle-fav") {
         const postId = event.data.postId;
-        followingPostsForMutation = updatePost(followingPostsForMutation, postId, CURRENT_USER_ID);
-        globalPostsForMutation = updatePost(globalPostsForMutation, postId, CURRENT_USER_ID);
+        followingPosts = updatePost(followingPosts, postId, CURRENT_USER_ID);
+        globalPosts = updatePost(globalPosts, postId, CURRENT_USER_ID);
       }
     };
     let persistedPosts = window.localStorage.getItem("posts");
     if (persistedPosts) {
-      [followingPostsForMutation, globalPostsForMutation] = JSON.parse(persistedPosts);
-      if (!(followingPostsForMutation instanceof Array) || !followingPostsForMutation) {
+      [followingPosts, globalPosts] = JSON.parse(persistedPosts);
+      if (!(followingPosts instanceof Array) || !followingPosts) {
         isFollowingPostsError = true;
         window.localStorage.removeItem("posts");
       }
-      if (!(globalPostsForMutation instanceof Array) || !globalPostsForMutation) {
+      if (!(globalPosts instanceof Array) || !globalPosts) {
         isGlobalPostsError = true;
         window.localStorage.removeItem("posts");
       }
       isFollowingPostsPending = false;
       isGlobalPostsPending = false;
     }
-    [followingPosts, globalPosts] = await Promise.all([
-      fetch("http://localhost:5173/posts?feed=user&userId=1").then((res) => res.json()),
-      fetch("http://localhost:5173/posts?feed=global").then((res) => res.json()),
+    [followingPostsResponse, globalPostsResponse] = await Promise.all([
+      fetch("http://localhost:5173/posts?feed=user&userId=1")
+        .then((res) => res.json())
+        .catch((e) => e),
+      fetch("http://localhost:5173/posts?feed=global")
+        .then((res) => res.json())
+        .catch((e) => e),
     ]);
+    if (followingPostsResponse instanceof Error) {
+      isFollowingPostsError = true;
+      followingPosts = [];
+    } else {
+      followingPosts = followingPostsResponse;
+    }
+    if (globalPostsResponse instanceof Error) {
+      isGlobalPostsError = true;
+      globalPosts = [];
+    } else {
+      globalPosts = globalPostsResponse;
+    }
     window.localStorage.setItem("posts", JSON.stringify([followingPosts, globalPosts]));
     isFollowingPostsPending = false;
     isGlobalPostsPending = false;
-    followingPostsForMutation = structuredClone(followingPosts);
-    globalPostsForMutation = structuredClone(globalPosts);
   });
 
   const handleToggleFav = (postId) => {
-    followingPostsForMutation = updatePost(followingPostsForMutation, postId, CURRENT_USER_ID);
-    globalPostsForMutation = updatePost(globalPostsForMutation, postId, CURRENT_USER_ID);
+    followingPosts = updatePost(followingPosts, postId, CURRENT_USER_ID);
+    globalPosts = updatePost(globalPosts, postId, CURRENT_USER_ID);
     broadcastChannel.postMessage({ type: "toggle-fav", postId: postId });
     fetch(`http://localhost:5173/post/${postId}`, {
       method: "POST",
@@ -65,8 +79,8 @@
         );
       })
       .catch(() => {
-        followingPostsForMutation = updatePost(followingPostsForMutation, postId, CURRENT_USER_ID);
-        globalPostsForMutation = updatePost(globalPostsForMutation, postId, CURRENT_USER_ID);
+        followingPosts = updatePost(followingPosts, postId, CURRENT_USER_ID);
+        globalPosts = updatePost(globalPosts, postId, CURRENT_USER_ID);
       });
   };
 </script>
@@ -85,7 +99,7 @@
         </div>
       </div>
     {:else}
-      <Posts posts={followingPostsForMutation} feedtitle="Your Posts" {handleToggleFav} />
+      <Posts posts={followingPosts} feedtitle="Your Posts" {handleToggleFav} />
     {/if}
     {#if isGlobalPostsPending}
       <div class="px-4 h-[calc(100vh-4rem)] grid place-items-center">Loading global posts...</div>
@@ -96,7 +110,7 @@
         </div>
       </div>
     {:else}
-      <Posts posts={globalPostsForMutation} feedtitle="Global Posts" {handleToggleFav} />
+      <Posts posts={globalPosts} feedtitle="Global Posts" {handleToggleFav} />
     {/if}
   </div>
 </main>

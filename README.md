@@ -69,15 +69,31 @@ if (feed === "user") {
 Using Svelte's onMount hook, which fires when the root component (App.svelte) is mounted, the feeds are fetched in parallel using Promise.all. Loading states of the two fetches are true on mount, and will be set to false once the response is available for render.
 
 ```js
-[followingPosts, globalPosts] = await Promise.all([
-    fetch("http://localhost:5173/posts?feed=user&userId=1").then((res) => res.json()),
-    fetch("http://localhost:5173/posts?feed=global").then((res) => res.json()),
-]);
+ [followingPostsResponse, globalPostsResponse] = await Promise.all([
+      fetch("http://localhost:5173/posts?feed=user&userId=1")
+        .then((res) => res.json())
+        .catch((e) => e),
+      fetch("http://localhost:5173/posts?feed=global")
+        .then((res) => res.json())
+        .catch((e) => e),
+    ]);
+    if (followingPostsResponse instanceof Error) {
+      isFollowingPostsError = true;
+      followingPosts = [];
+    } else {
+      followingPosts = followingPostsResponse;
+    }
+    if (globalPostsResponse instanceof Error) {
+      isGlobalPostsError = true;
+      globalPosts = [];
+    } else {
+      globalPosts = globalPostsResponse;
+    }
 ```
 
 The posts data for a feed is rendered using Svelte's if-else blocks:
 
-```html
+```svelte
 {#if isFollowingPostsPending}
     <div class="px-4 h-[calc(100vh-4rem)] grid place-items-center">Loading your posts...</div>
 {:else if isFollowingPostsError}
@@ -87,7 +103,7 @@ The posts data for a feed is rendered using Svelte's if-else blocks:
     </div>
     </div>
 {:else}
-    <Posts posts={followingPostsForMutation} feedtitle="Your Posts" {handleToggleFav} />
+    <Posts posts={followingPosts} feedtitle="Your Posts" {handleToggleFav} />
 {/if}
 ```
 
@@ -97,8 +113,8 @@ A handleToggleFav function which is defined in the parent component is passed as
 
 ```js
 const handleToggleFav = (postId) => {
-    followingPostsForMutation = updatePost(followingPostsForMutation, postId, CURRENT_USER_ID);
-    globalPostsForMutation = updatePost(globalPostsForMutation, postId, CURRENT_USER_ID);
+    followingPosts = updatePost(followingPosts, postId, CURRENT_USER_ID);
+    globalPosts = updatePost(globalPosts, postId, CURRENT_USER_ID);
     broadcastChannel.postMessage({ type: "toggle-fav", postId: postId });
     fetch(`http://localhost:5173/post/${postId}`, {
         method: "POST",
@@ -114,8 +130,8 @@ const handleToggleFav = (postId) => {
             );
         })
         .catch(() => {
-            followingPostsForMutation = updatePost(followingPostsForMutation, postId, CURRENT_USER_ID);
-            globalPostsForMutation = updatePost(globalPostsForMutation, postId, CURRENT_USER_ID);
+            followingPosts = updatePost(followingPosts, postId, CURRENT_USER_ID);
+            globalPosts = updatePost(globalPosts, postId, CURRENT_USER_ID);
         });
 };
 ```
@@ -135,8 +151,8 @@ const broadcastChannel = new BroadcastChannel("fav");
 broadcastChannel.onmessage = (event) => {
     if (event.data.type === "toggle-fav") {
         const postId = event.data.postId;
-        followingPostsForMutation = updatePost(followingPostsForMutation, postId, CURRENT_USER_ID);
-        globalPostsForMutation = updatePost(globalPostsForMutation, postId, CURRENT_USER_ID);
+        followingPosts = updatePost(followingPosts, postId, CURRENT_USER_ID);
+        globalPosts = updatePost(globalPosts, postId, CURRENT_USER_ID);
     }
 };
 
@@ -161,12 +177,12 @@ On component mount, before the API calls to fetch the feeds data are initiated, 
 ```js
 let persistedPosts = window.localStorage.getItem("posts");
 if (persistedPosts) {
-    [followingPostsForMutation, globalPostsForMutation] = JSON.parse(persistedPosts);
-    if (!(followingPostsForMutation instanceof Array) || !followingPostsForMutation) {
+    [followingPosts, globalPosts] = JSON.parse(persistedPosts);
+    if (!(followingPosts instanceof Array) || !followingPosts) {
         isFollowingPostsError = true;
         window.localStorage.removeItem("posts");
     }
-    if (!(globalPostsForMutation instanceof Array) || !globalPostsForMutation) {
+    if (!(globalPosts instanceof Array) || !globalPosts) {
         isGlobalPostsError = true;
         window.localStorage.removeItem("posts");
     }

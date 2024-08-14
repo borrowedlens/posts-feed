@@ -4,7 +4,7 @@ import { updatePost } from "../lib/utils";
 
 export const handlers = [
   http.get("http://localhost:5173/posts?feed=user&userId=1", async ({ request }) => {
-    await delay(3000);
+    await delay(1000);
     const url = new URL(request.url);
     const feed = url.searchParams.get("feed");
     let followingPosts, globalPosts;
@@ -23,7 +23,7 @@ export const handlers = [
     }
   }),
   http.post("http://localhost:5173/post/:id", async ({ params, request }) => {
-    await delay(3000);
+    await delay(1000);
     const postId = params.id;
     const reqData = await request.json();
     let followingPosts, globalPosts;
